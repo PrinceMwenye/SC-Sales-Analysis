@@ -1,0 +1,182 @@
+---
+title: "augsales"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+rm(list = ls())
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(stringr)
+
+Augsales <- read.csv('augsales.csv')
+duplicates <-  Augsales[duplicated(Augsales), ] #we have 3 duplicates
+Augsales <- unique(Augsales) #no duplicates, manually removed
+
+augrates<- read.csv('augrates.csv')
+
+Augusd <- read.csv('augusd.csv')
+Augusd <- unique(Augusd)
+```
+
+```{r}
+cleaner <- function(x) {
+  x <- as.character(x) 
+  x <- gsub(',','',x) %>%
+  as.double(x)
+  x
+}
+
+
+```
+
+
+
+
+```{r}
+#use apply family here
+Augsales$Sales.Amount <- cleaner(Augsales$Sales.Amount)
+
+Augsales$Sales.Returns <- cleaner(Augsales$Sales.Returns)
+
+augrates$Date <- dmy(augrates$Date)
+
+Augsales$Date <- dmy(Augsales$Date)
+
+```
+
+
+```{r}
+library(plyr)
+Augsales$Location <- revalue(Augsales$Location, c('118ENT' = 'RET118'))
+Augusd$Location <- revalue(Augusd$Location, c('BYO' = 'SCBYO'))
+
+```
+
+
+```{r}
+
+Augusd <- Augusd %>%  mutate(currency = 'USD')
+
+
+#invoice sepaation function
+invoices <- vector()
+serp <- function(x) {
+  x <- as.character(x)
+  for (i in 1:length(x)) {
+    if(str_sub(x[i],1,2) %in% c('IN')) {
+      x[i] <- str_sub(x[i], 8)
+    }
+    else {x[i] <- str_sub(x[i], 10)}
+    invoices[[i]] <- x[i]
+  }
+  invoices <- as.numeric(invoices)
+  return(invoices)
+}
+
+
+
+
+
+Augsales$Transaction.Number <- serp(Augsales$Transaction.Number)
+
+
+
+```
+
+
+```{r}
+
+Augsales <-left_join(Augsales, Augusd,  
+                        by = c('Transaction.Number' = 'Inv_num')) 
+
+Augsales <- unique(Augsales) 
+
+Augsales <- Augsales[-c(11,12,13)]
+```
+
+
+
+
+```{r}
+Augsales <- unique(Augsales)
+
+
+Augsales <- Augsales %>% mutate(new_currency = ifelse(currency%in% c('USD'),  'USD', 
+                                                            'RTGS'))
+
+
+Augsales$new_currency <- factor(Augsales$new_currency, 
+                                   levels = c('USD', 'RTGS'))
+
+Augsales <- left_join(Augsales, 
+                         augrates, 
+                         by = c('Date.x' = 'Date'))
+
+purestcosts <- read.csv('puremastercost.csv')
+
+Augsales <- left_join(Augsales, purestcosts, 
+                         by = c('Product.id' = 'Product_id'))
+```
+
+
+
+```{r}
+#profit calculation
+Augsales <- unique(Augsales)
+Augsales$usd <- as.numeric(as.character(Augsales$usd))
+Augsales <- Augsales %>% mutate(USD_income = ifelse(new_currency %in% c('RTGS'), 
+                                                          Sales.Amount /SCrate, 
+                                                          usd/1.145 ))
+
+
+inv_totals <- Augsales %>% 
+  group_by(Transaction.Number) %>% 
+  summarise(total = sum(Sales.Amount))
+
+Augsales <- left_join(Augsales, inv_totals, by = 'Transaction.Number')
+
+
+Augsales <- Augsales %>% mutate(product_income = ifelse(new_currency %in% c('USD'), 
+                                                              (Sales.Amount/ total * USD_income), 
+                                                              USD_income))
+
+Augsales$real_COST <- ifelse(str_sub(Augsales$Product.id,1,3) %in% c('LAB'), 
+                                0, Augsales$real_COST)
+
+Augsales <- Augsales %>% mutate(Gross_Profit = product_income - real_COST)
+
+Augsales %>% group_by(new_currency) %>% summarise(total = sum(product_income, na.rm = TRUE))
+                                                                                          
+                                                                                          
+Augsales %>% group_by(new_currency) %>% summarise(n_distinct(Transaction.Number))
+
+
+
+Augsales %>% group_by(Location.x) %>% summarise(perlocation = sum(product_income, na.rm = TRUE))
+
+Augsales <- unique(Augsales)
+
+write.csv(Augsales, 'finalAugsales.csv', col.names = TRUE, row.names = FALSE) 
+```
+
+
+
+
+
+
+```{r}
+#nocost
+Junocost <- mayallsales %>% filter(is.na(real_COST & str_sub(Product.id, 1,3) != 'LAB'))
+
+Maynocost <- Maynocost %>% group_by(Product.id) %>% count()
+
+write.csv(Maynocost, 'maynocost.csv', col.names = TRUE, row.names = FALSE)
+```
