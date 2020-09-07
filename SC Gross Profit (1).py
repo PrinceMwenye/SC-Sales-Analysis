@@ -8,10 +8,11 @@ Created on Mon Aug  3 12:41:13 2020
 
 #import data and remove duplicates
 
+
 import pandas as pd
 import numpy as np
 import re
-data = pd.read_csv('augsales.csv')
+data = pd.read_csv('sepsales.csv')
 
 data = data[data['Year'] != 'Customer Total:']
 
@@ -63,8 +64,8 @@ trial = trial.drop(['Year', 'Prd.', 'Type', 'Cost of Sales', 'Percent'], axis = 
 
 julysales = trial
 julysales= julysales.drop_duplicates()
-julyrates = pd.read_csv('Augrates.csv')
-julyusd = pd.read_csv('Augusd.csv')
+julyrates = pd.read_csv('seprates.csv')
+julyusd = pd.read_csv('SepUSD.csv')
 purecosts = pd.read_csv('puremastercost.csv')
 
 import re
@@ -202,7 +203,7 @@ julysales = julysales[julysales['Quantity'] != 0]
                       
 
 
-julysales.to_csv('augsalesfinal.csv', index = False)
+julysales.to_csv('sepsalesfinal.csv', index = False)
 
 julysales.individual_income.sum()
 julysales.Real_Gross_Profit.sum()
@@ -221,6 +222,9 @@ julysales.groupby('Location_x')['Real_Gross_Profit'].sum().sort_values(ascending
 no_cost = julysales[julysales['real_cost'].isnull()]
 no_cost = pd.DataFrame(no_cost.groupby('Product_num')['real_cost'].size())
 no_cost.to_csv('missingcosts.csv', index = True)
+
+
+
 
 
 
