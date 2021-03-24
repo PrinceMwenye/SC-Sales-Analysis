@@ -115,7 +115,7 @@ novsales['Currency'] = novsales['Currency'].map(currency)
 novsales['Currency'] = novsales['Currency'].astype('category')
 
 
-novsales = pd.merge(novsales, novrates, how = 'left',
+novsales = pd.merge(novsales, novrates, how = 'left',    #get novsales wtih respective rates of the day
                     left_on = 'Date_x',
                     right_on = 'Date')
 
